@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Flag, FolderKanban, Plus } from 'lucide-react';
 import { useSnapshot } from '../lib/api';
-import type { Milestone, Project, Task } from '../../shared/types';
+import type { Goal, Milestone, Project, Task } from '../../shared/types';
 import { MilestoneForm, MilestoneList, ProjectForm, ProjectList, TaskForm, TaskTable } from './work';
-import { Button, Empty, Panel, Segmented } from './ui';
+import { Button, Panel, Segmented } from './ui';
+import { GoalForm, GoalsTable, MetricsPanel, ReviewEditor } from './performance';
+import { LinkedKnowledge } from './knowledge';
 
 export function AssetWorkTab({ assetId }: { assetId: number }) {
   const { data: s } = useSnapshot();
@@ -38,9 +40,21 @@ export function AssetWorkTab({ assetId }: { assetId: number }) {
   );
 }
 
-export function AssetGoalsTab(_: { assetId: number }) {
-  return <Empty title="Goals arrive in a later phase" />;
+export function AssetGoalsTab({ assetId }: { assetId: number }) {
+  const { data: s } = useSnapshot();
+  const [editing, setEditing] = useState<Goal | 'new' | null>(null);
+  if (!s) return null;
+  return (
+    <div className="grid">
+      <Panel title="Goals" sub="Actual performance against your targets" pad={false} actions={<Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setEditing('new')}>Goal</Button>}>
+        <div style={{ paddingTop: 10 }}><GoalsTable goals={s.goals.filter((g) => g.asset_id === assetId)} showAsset={false} onEdit={setEditing} /></div>
+      </Panel>
+      <MetricsPanel assetId={assetId} />
+      <ReviewEditor assetId={assetId} />
+      {editing && <GoalForm goal={editing === 'new' ? undefined : editing} assetId={assetId} onClose={() => setEditing(null)} />}
+    </div>
+  );
 }
-export function AssetKnowledgeTab(_: { assetId: number }) {
-  return <Empty title="Notes arrive in phase 5" />;
+export function AssetKnowledgeTab({ assetId }: { assetId: number }) {
+  return <LinkedKnowledge assetId={assetId} />;
 }

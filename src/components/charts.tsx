@@ -68,7 +68,7 @@ const compact = (currency: string) => (v: number) => formatMoney(v, currency, { 
 export interface CashflowPoint { month: string; revenue: number; opex: number; profit: number }
 
 /** Monthly revenue and expenses as bars with operating profit as a line. Single money axis. */
-export function CashflowChart({ data, currency, height = 280 }: { data: CashflowPoint[]; currency: string; height?: number }) {
+export function CashflowChart({ data, currency, height = 280, animate = true }: { data: CashflowPoint[]; currency: string; height?: number; animate?: boolean }) {
   if (!data.some((d) => d.revenue || d.opex)) return <Empty compact title="No revenue or expenses recorded yet">Add transactions in Finance to see monthly performance.</Empty>;
   const rows = data.map((d) => ({ ...d, expenses: d.opex }));
   return (
@@ -83,9 +83,9 @@ export function CashflowChart({ data, currency, height = 280 }: { data: Cashflow
           <YAxis tickFormatter={compact(currency)} {...axisProps} axisLine={false} width={64} />
           <ReferenceLine y={0} stroke="#33476d" />
           <Tooltip content={<MoneyTooltip currency={currency} labelFmt={(m) => formatMonth(m, true)} />} cursor={{ fill: 'rgba(110,168,240,0.06)' }} />
-          <Bar dataKey="revenue" name="Revenue" fill={SERIES[0]} radius={[4, 4, 0, 0]} maxBarSize={22} />
-          <Bar dataKey="expenses" name="Operating expenses" fill={SERIES[1]} radius={[4, 4, 0, 0]} maxBarSize={22} />
-          <Line dataKey="profit" name="Operating profit" stroke={SERIES[2]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: SERIES[2] }} activeDot={{ r: 5, stroke: '#0f1729', strokeWidth: 2 }} type="monotone" />
+          <Bar isAnimationActive={animate} dataKey="revenue" name="Revenue" fill={SERIES[0]} radius={[4, 4, 0, 0]} maxBarSize={22} />
+          <Bar isAnimationActive={animate} dataKey="expenses" name="Operating expenses" fill={SERIES[1]} radius={[4, 4, 0, 0]} maxBarSize={22} />
+          <Line isAnimationActive={animate} dataKey="profit" name="Operating profit" stroke={SERIES[2]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: SERIES[2] }} activeDot={{ r: 5, stroke: '#0f1729', strokeWidth: 2 }} type="monotone" />
         </ComposedChart>
       </ResponsiveContainer>
     </ChartFrame>
