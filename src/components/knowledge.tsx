@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Download, ExternalLink, FileText, Paperclip, Pencil, Pin, Plus, Trash2, Upload } from 'lucide-react';
-import { invalidateAll, uploadDocument, useList, useRemove, useSave, useSnapshot } from '../lib/api';
+import { downloadFile, invalidateAll, uploadDocument, useList, useRemove, useSave, useSnapshot } from '../lib/api';
 import { useForm, idOrNull } from '../lib/form';
 import { cx } from '../lib/format';
 import { NOTE_KINDS } from '../../shared/domain';
@@ -80,8 +80,8 @@ export function UploadForm({ defaults, onClose }: { defaults?: Links; onClose: (
   const f = useForm({ description: '', asset_id: String(defaults?.assetId ?? ''), project_id: String(defaults?.projectId ?? ''), opportunity_id: String(defaults?.opportunityId ?? ''), busy: false });
   const submit = async () => {
     if (!files.length) return f.setFormError('Choose at least one file.');
-    const big = files.find((x) => x.size > 25 * 1024 * 1024);
-    if (big) return f.setFormError(`${big.name} is larger than 25 MB.`);
+    const big = files.find((x) => x.size > 50 * 1024 * 1024);
+    if (big) return f.setFormError(`${big.name} is larger than 50 MB.`);
     f.set('busy', true);
     try {
       for (const file of files) await uploadDocument(file, { asset_id: idOrNull(f.values.asset_id), project_id: idOrNull(f.values.project_id), opportunity_id: idOrNull(f.values.opportunity_id) }, f.values.description || undefined);
@@ -100,7 +100,7 @@ export function UploadForm({ defaults, onClose }: { defaults?: Links; onClose: (
           <input ref={fileRef} type="file" multiple hidden onChange={(e) => setFiles([...(e.target.files ?? [])])} />
           <Button type="button" icon={<Paperclip size={15} />} onClick={() => fileRef.current?.click()}>{files.length ? `${files.length} file${files.length > 1 ? 's' : ''} selected` : 'Choose files'}</Button>
           {files.length > 0 && <div className="cell-sub mt-sm">{files.map((x) => `${x.name} (${formatBytes(x.size)})`).join(', ')}</div>}
-          <div className="field-hint mt-sm">Stored inside your database, so they are included in every backup. Max 25 MB each.</div>
+          <div className="field-hint mt-sm">Stored in this browser and included in every backup you download. Max 50 MB each.</div>
         </div>
         <Field label="Description" span={3}>{(id) => <Input id={id} value={f.values.description} onChange={(x) => f.set('description', x)} />}</Field>
         <Field label="Asset">{(id) => <AssetSelect id={id} value={f.values.asset_id} onChange={(x) => f.set('asset_id', x)} placeholder="None" />}</Field>
@@ -114,6 +114,7 @@ export function UploadForm({ defaults, onClose }: { defaults?: Links; onClose: (
 export function DocumentTable({ docs, showLinks = true }: { docs: DocumentMeta[]; showLinks?: boolean }) {
   const remove = useRemove('documents');
   const confirm = useConfirm();
+  const toast = useToast();
   const linkLabel = useLinkLabel();
   if (!docs.length) return <Empty compact title="No documents" />;
   return (
@@ -124,7 +125,7 @@ export function DocumentTable({ docs, showLinks = true }: { docs: DocumentMeta[]
           {docs.map((d) => (
             <tr key={d.id}>
               <td>
-                <a className="link cell-main row gap-xs" href={`/api/documents/${d.id}/file`} target="_blank" rel="noopener"><FileText size={14} /> {d.filename}</a>
+                <button type="button" className="link cell-main row gap-xs" style={{ background: 'none', border: 0, padding: 0, font: 'inherit', cursor: 'pointer' }} onClick={() => downloadFile(`/api/documents/${d.id}/file`, 'open').catch((e) => toast((e as Error).message, 'bad'))}><FileText size={14} /> {d.filename}</button>
                 {d.description && <div className="cell-sub">{d.description}</div>}
               </td>
               {showLinks && <td><div className="row gap-xs wrap">{linkLabel(d).length ? linkLabel(d) : <span className="muted small">Holding company</span>}</div></td>}
@@ -132,9 +133,9 @@ export function DocumentTable({ docs, showLinks = true }: { docs: DocumentMeta[]
               <td className="subtle small">{formatDate(d.created_at.slice(0, 10))}</td>
               <td className="actions">
                 <span className="row-actions">
-                  <a className="btn btn-ghost btn-sm btn-icon" href={`/api/documents/${d.id}/file?download=1`} aria-label="Download"><Download size={13} /></a>
+                  <Button size="sm" variant="ghost" icon={<Download size={13} />} aria-label="Download" onClick={() => downloadFile(`/api/documents/${d.id}/file`).catch((e) => toast((e as Error).message, 'bad'))} />
                   <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} aria-label="Delete" onClick={async () => {
-                    if (await confirm({ title: `Delete ${d.filename}?`, body: 'The file is removed from the database. Older backups still contain it.', danger: true, confirmLabel: 'Delete' })) remove.mutate({ id: d.id });
+                    if (await confirm({ title: `Delete ${d.filename}?`, body: 'The file is removed from this browser. Backups you downloaded earlier still contain it.', danger: true, confirmLabel: 'Delete' })) remove.mutate({ id: d.id });
                   }} />
                 </span>
               </td>

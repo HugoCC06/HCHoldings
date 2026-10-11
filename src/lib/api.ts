@@ -5,6 +5,7 @@ import type {
 } from '../../shared/types';
 import type { Settings } from '../../shared/schemas';
 import type { TxnLite } from '../../shared/finance';
+import { localRequest } from '../local/client';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public fields?: Record<string, string[]>) {
@@ -16,24 +17,42 @@ export const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } },
 });
 
-export async function api<T>(url: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
-  const { json, ...rest } = init;
-  const res = await fetch(url, {
-    ...rest,
-    headers: json !== undefined ? { 'Content-Type': 'application/json', ...rest.headers } : rest.headers,
-    body: json !== undefined ? JSON.stringify(json) : rest.body,
-  });
-  if (res.status === 204) return undefined as T;
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    if (res.status === 401 && !url.startsWith('/api/auth')) window.dispatchEvent(new Event('hcos:unauthorised'));
-    throw new ApiError(res.status, body.error ?? `Request failed (${res.status})`, body.fields);
+/** All data lives in this browser; requests are served by the local data engine. */
+export async function api<T>(url: string, init: { method?: string; json?: unknown; body?: unknown } = {}): Promise<T> {
+  const res = await localRequest(init.method ?? 'GET', url, init.json !== undefined ? init.json : init.body);
+  if (res.status >= 400) {
+    const b = (res.body ?? {}) as { error?: string; fields?: Record<string, string[]> };
+    throw new ApiError(res.status, b.error ?? `Request failed (${res.status})`, b.fields);
   }
-  return body as T;
+  return res.body as T;
+}
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/** Fetch a file-producing route (backup, exports, documents) and save or open it. */
+export async function downloadFile(url: string, mode: 'save' | 'open' = 'save') {
+  const res = await localRequest('GET', url);
+  if (res.status >= 400 || !res.blob) throw new ApiError(res.status, (res.body as { error?: string })?.error ?? 'Download failed');
+  if (mode === 'open') {
+    const obj = URL.createObjectURL(res.blob);
+    const w = window.open(obj, '_blank', 'noopener');
+    if (!w) saveBlob(res.blob, res.filename ?? 'file');
+    setTimeout(() => URL.revokeObjectURL(obj), 60_000);
+  } else saveBlob(res.blob, res.filename ?? 'download');
 }
 
 export interface Snapshot {
   settings: Settings;
+  meta: { lastBackupAt?: string | null };
   assets: Asset[];
   valuations: Valuation[];
   transactions: (TxnLite & { id: number })[];
@@ -110,20 +129,7 @@ export function useRemove(resource: ResourceName) {
 
 export async function uploadDocument(file: File, links: Record<string, number | null | undefined>, description?: string) {
   const params = qs({ filename: file.name, description, ...links });
-  return api<DocumentMeta>(`/api/documents${params}`, {
-    method: 'POST',
-    headers: { 'Content-Type': file.type || 'application/octet-stream' },
-    body: file,
-  });
-}
-
-export function downloadFile(url: string) {
-  const a = document.createElement('a');
-  a.href = url;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  return api<DocumentMeta>(`/api/documents${params}`, { method: 'POST', body: file });
 }
 
 export function downloadText(filename: string, text: string, type = 'text/csv;charset=utf-8') {

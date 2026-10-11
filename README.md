@@ -5,82 +5,30 @@ portfolio dashboard, asset register, financial records, projects and tasks, acqu
 pipeline with valuation calculators, notes and documents, monthly reviews and reports.
 
 It is deliberately **not** a SaaS: no sign-up, no tenants, no billing, no external integrations.
-Everything runs on your own machine and lives in one SQLite file.
+It is one HTML file that runs in Chrome and keeps your data privately in your browser.
 
-## Quick start
+## How to open it
 
-```bash
-npm install
-npm run build
-npm start            # http://127.0.0.1:4310
-```
+**It's a single file: `index.html`.** No installation, no server, no account.
 
-Development mode (hot reload for UI and API):
+* **On your computer:** download `index.html` from this repository and double-click it (or drag it into Chrome).
+* **On GitHub Pages:** Settings → Pages → *Deploy from a branch* → pick the branch that contains this
+  `index.html` and the `/ (root)` folder, then open the URL GitHub shows.
 
-```bash
-npm run dev          # UI on http://127.0.0.1:5173, API on :4310
-```
+### Where your data lives
 
-Requires Node.js 20+.
+Everything you enter is stored **inside your browser** (Chrome's IndexedDB storage) on that computer.
+Nothing is sent anywhere — even on GitHub Pages the page is only the app; your figures never leave your machine.
 
-### Configuration
+That also means:
 
-Copy `.env.example` values into your shell or a process manager. All optional:
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `PORT` | `4310` | Port for the API and built UI |
-| `HOST` | `127.0.0.1` | Interface to bind. Keep it local unless you also set a password |
-| `DATA_DIR` | `./data` | Where the database and automatic backups live |
-| `APP_PASSWORD` | – | If set, the app asks for this password (signed, HTTP-only session cookie, 30 days) |
-
-### Try it with sample data
-
-```bash
-DATA_DIR=./demo-data npx tsx scripts/seed-demo.ts
-DATA_DIR=./demo-data npm start
-```
-
-The seed script refuses to touch `./data` or any database that already has assets.
-
-## Architecture
-
-```
-shared/   Pure TypeScript used by both sides — domain vocabularies, validation (zod),
-          money/date helpers, and every financial calculation (finance.ts, valuation.ts,
-          insights.ts, csv.ts). This is the tested core.
-server/   Express + better-sqlite3. Generic validated CRUD (resource.ts), CSV import/export,
-          documents, search, backup/restore (store.ts), schema migrations (db.ts).
-src/      React + Vite + TanStack Query + Recharts. Pages per area, shared UI kit.
-tests/    Vitest: calculations, CSV parsing/dedup, API behaviour, backup/restore, auth.
-```
-
-Design decisions:
-
-* **One SQLite file holds everything**, including uploaded documents (as BLOBs). A backup is
-  one file; restoring is uploading that file.
-* **Money is stored as integer minor units** (pence/cents). No floating-point drift.
-* **Figures are always derived from records.** Nothing is hard-coded or estimated for you;
-  empty states appear until there is data.
-* **Transaction categories carry a class** that fixes how they are treated:
-  `revenue` and `opex` make up operating profit; `capital` (one-off investments,
-  acquisition costs) adds to invested capital only; `owner` (contributions, distributions)
-  affects cash flow only. Cash balances are separate dated snapshots. Estimated values are
-  separate dated valuations. These never mix.
-* **Capital invested** in an asset = its purchase price + capital transactions against it.
-* **ROIC** = trailing-12-month operating profit ÷ capital invested. With less than
-  12 months of history, profit is annualised and the figure is marked with `*`.
-* "Monthly" dashboard figures use the **last complete calendar month**.
-
-## Data safety
-
-* An automatic backup is taken on start-up and then daily (`DATA_DIR/backups`, last 14 kept).
-* Settings → Backup lets you download a backup, create one on demand, restore from a file
-  (validated first; a safety backup of the current data is taken before replacing), and export
-  everything as JSON.
-* CSV imports detect duplicates (against existing records and within the file), show a preview
-  with per-row errors before anything is saved, and each import batch can be undone.
-* The server binds to `127.0.0.1` by default and stores data with owner-only file permissions.
+* Each browser, and each address, keeps its own separate data. The file opened from your Downloads folder and
+  the GitHub Pages URL are two different places — pick one and stick with it.
+* Clearing Chrome's site data, or using a private/incognito window, loses it. **Use Settings → Download backup
+  regularly.** The backup is one `.json` file containing every record and document; Settings → Restore brings it
+  back on any computer or browser.
+* A restore point is also kept inside the browser automatically each day you open the app (last 14), so you can
+  undo mistakes. The app reminds you when you haven't downloaded a backup for 14 days.
 
 ## What's in it
 
@@ -94,13 +42,51 @@ Design decisions:
 | **Acquisitions** | Pipeline by stage, verified vs seller-reported monthly figures, valuation calculator (multiple + DCF, three scenarios, IRR, yield, payback, max price), convert to an owned asset |
 | **Notes & documents** | Typed notes with tags and links to assets/projects/opportunities, file uploads, search |
 | **Reports** | Printable monthly report and CSV export |
-| **Settings** | Company name, currency, backups, restore, JSON export |
+| **Settings** | Company name, currency, download backup, restore, restore points, JSON export |
 
 Press <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> anywhere to search.
 
-## Tests
+## Changing the app
+
+Source code is in `src/` (UI and the in-browser data engine) and `shared/` (calculations, validation, CSV).
 
 ```bash
-npm test
-npm run typecheck
+npm install
+npm run dev      # live-reloading development version at http://127.0.0.1:5173/app.html
+npm test         # automated tests
+npm run build    # rebuilds the single-file app and writes it to ./index.html
 ```
+
+Node.js 20+ is only needed for development — not for using the app.
+
+## Architecture
+
+```
+index.html  The built app — code, styles and fonts inlined into one file. Generated by `npm run build`.
+app.html    Development entry point used to build index.html.
+shared/     Pure TypeScript: domain vocabularies, validation (zod), money/date helpers and every
+            financial calculation (finance.ts, valuation.ts, insights.ts, csv.ts). The tested core.
+src/local/  In-browser data engine: validated create/read/update/delete for every record type,
+            relationship rules (what deleting an asset removes or unlinks), CSV import with duplicate
+            detection, backups and restore points — persisted to IndexedDB.
+src/        React UI (pages, components, charts).
+tests/      Vitest: calculations, CSV parsing/dedup, the data engine, backup/restore, persistence.
+```
+
+Design decisions:
+
+* **Money is stored as integer minor units** (pence/cents). No floating-point drift.
+* **Figures are always derived from records.** Nothing is hard-coded or estimated for you; empty states
+  appear until there is data.
+* **Transaction categories carry a class** that fixes how they are treated: `revenue` and `opex` make up
+  operating profit; `capital` (one-off investments, acquisition costs) adds to invested capital only;
+  `owner` (contributions, distributions) affects cash flow only. Cash balances are separate dated snapshots.
+  Estimated values are separate dated valuations. These never mix.
+* **Capital invested** in an asset = its purchase price + capital transactions against it.
+* **ROIC** = trailing-12-month operating profit ÷ capital invested. With less than 12 months of history,
+  profit is annualised and the figure is marked with `*`.
+* "Monthly" dashboard figures use the **last complete calendar month**.
+* Every write is validated, applied to a copy and saved before it is accepted, so a failed save never
+  leaves half-written data.
+* CSV imports show a preview with per-row errors before anything is saved, flag rows already recorded
+  (or repeated in the file), and each import batch can be undone under Finance → Import history.

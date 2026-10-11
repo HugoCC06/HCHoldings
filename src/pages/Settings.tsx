@@ -4,7 +4,6 @@ import { DatabaseBackup, Download, FileJson, HardDriveDownload, Upload } from 'l
 import { api, downloadFile, invalidateAll, queryClient, useSnapshot } from '../lib/api';
 import { useForm } from '../lib/form';
 import { CURRENCIES } from '../../shared/domain';
-import { formatBytes } from '../components/knowledge';
 import { Button, ErrorBox, Field, FormGrid, Input, Loading, PageHeader, Panel, Select, useConfirm, useToast } from '../components/ui';
 
 export function SettingsPage() {
@@ -13,7 +12,7 @@ export function SettingsPage() {
   if (error || !s) return <ErrorBox error={error} />;
   return (
     <>
-      <PageHeader title="Settings & backups" subtitle="Your data lives in a single local database file. Back it up regularly." />
+      <PageHeader title="Settings & backups" subtitle="Everything is stored privately in this browser. Download backups regularly." />
       <div className="grid grid-2">
         <GeneralSettings initial={s.settings} />
         <BackupPanel />
@@ -55,21 +54,13 @@ function BackupPanel() {
   const confirm = useConfirm();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const backups = useQuery({ queryKey: ['backups'], queryFn: () => api<{ file: string; size: number; created: string }[]>('/api/backups') });
-
-  const restore = async (file: File) => {
-    const ok = await confirm({
-      title: 'Restore from this backup?',
-      body: <>All current data will be replaced by <b>{file.name}</b>. A safety backup of your current data is created first, so this can be undone.</>,
-      danger: true,
-      confirmLabel: 'Restore',
-    });
-    if (!ok) return;
-    setBusy('restore');
+  const points = useQuery({ queryKey: ['backups'], queryFn: () => api<{ key: string; created: string; reason: string }[]>('/api/backups') });
+  const run = async (key: string, fn: () => Promise<unknown>, done: string) => {
+    setBusy(key);
     try {
-      await api('/api/restore', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+      await fn();
       await queryClient.resetQueries();
-      toast('Backup restored');
+      toast(done);
     } catch (e) {
       toast((e as Error).message, 'bad');
     } finally {
@@ -77,33 +68,53 @@ function BackupPanel() {
     }
   };
 
+  const restore = async (file: File) => {
+    const ok = await confirm({
+      title: 'Restore from this backup?',
+      body: <>All current data will be replaced by <b>{file.name}</b>. A restore point of your current data is saved first, so this can be undone below.</>,
+      danger: true,
+      confirmLabel: 'Restore',
+    });
+    if (ok) run('restore', () => api('/api/restore', { method: 'POST', body: file }), 'Backup restored');
+  };
+
   return (
-    <Panel title="Backup & restore" sub="Backups include every record and uploaded document.">
+    <Panel title="Backup & restore" sub="Your data is stored only in this browser on this computer.">
       <div className="stack gap-md">
-        <div className="row gap-sm wrap">
-          <Button variant="primary" icon={<HardDriveDownload size={15} />} onClick={() => downloadFile('/api/backup')}>Download backup</Button>
-          <Button icon={<DatabaseBackup size={15} />} loading={busy === 'create'} onClick={async () => {
-            setBusy('create');
-            try { await api('/api/backups', { method: 'POST' }); await backups.refetch(); toast('Backup created'); } catch (e) { toast((e as Error).message, 'bad'); } finally { setBusy(null); }
-          }}>Create backup now</Button>
-          <Button icon={<Upload size={15} />} loading={busy === 'restore'} onClick={() => fileRef.current?.click()}>Restore from file…</Button>
-          <input ref={fileRef} type="file" accept=".sqlite,.db,application/octet-stream" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) restore(f); }} />
+        <div className="alert alert-warn">
+          Nothing is uploaded anywhere. That keeps it private, but it also means clearing Chrome’s site data, or using another browser or computer, starts empty.
+          <b> Download a backup regularly</b> and keep it somewhere safe. To move to another computer, restore that file there.
         </div>
         <div className="row gap-sm wrap">
-          <Button size="sm" variant="ghost" icon={<FileJson size={14} />} onClick={() => downloadFile('/api/export.json')}>Export all data as JSON</Button>
-          <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => downloadFile('/api/transactions/export.csv')}>Export transactions CSV</Button>
+          <Button variant="primary" icon={<HardDriveDownload size={15} />} loading={busy === 'download'} onClick={() => run('download', () => downloadFile('/api/backup'), 'Backup downloaded')}>Download backup</Button>
+          <Button icon={<Upload size={15} />} loading={busy === 'restore'} onClick={() => fileRef.current?.click()}>Restore from backup file…</Button>
+          <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) restore(f); }} />
         </div>
-        <div className="alert alert-info">
-          An automatic backup is taken when the app starts and once a day (last 14 kept) in the <code>backups</code> folder next to the database. Copy downloaded backups somewhere off this machine — an external drive or your own cloud storage.
+        <div className="row gap-sm wrap">
+          <Button size="sm" variant="ghost" icon={<FileJson size={14} />} onClick={() => downloadFile('/api/export.json').catch((e) => toast((e as Error).message, 'bad'))}>Export all data as JSON</Button>
+          <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => downloadFile('/api/transactions/export.csv').catch((e) => toast((e as Error).message, 'bad'))}>Export transactions CSV</Button>
         </div>
         <div>
-          <div className="stat-label" style={{ marginBottom: 8 }}>Backups on this machine</div>
-          {backups.isLoading ? <Loading /> : backups.data?.length ? (
+          <div className="row between" style={{ marginBottom: 8 }}>
+            <div className="stat-label">Restore points in this browser</div>
+            <Button size="sm" icon={<DatabaseBackup size={14} />} loading={busy === 'point'} onClick={() => run('point', () => api('/api/backups', { method: 'POST' }), 'Restore point saved')}>Save restore point</Button>
+          </div>
+          <p className="cell-sub" style={{ marginBottom: 8 }}>One is saved automatically each day you open the app (last 14 kept). They protect against mistakes, not against clearing browser data.</p>
+          {points.isLoading ? <Loading /> : points.data?.length ? (
             <table className="table compact">
-              <thead><tr><th>File</th><th className="num">Size</th><th>Created</th></tr></thead>
+              <thead><tr><th>Saved</th><th>Reason</th><th /></tr></thead>
               <tbody>
-                {backups.data.slice(0, 20).map((b) => (
-                  <tr key={b.file}><td className="small">{b.file}</td><td className="num subtle">{formatBytes(b.size)}</td><td className="subtle small">{new Date(b.created).toLocaleString('en-GB')}</td></tr>
+                {points.data.map((b) => (
+                  <tr key={b.key}>
+                    <td className="small">{new Date(b.created).toLocaleString('en-GB')}</td>
+                    <td className="subtle small">{b.reason}</td>
+                    <td className="actions">
+                      <Button size="sm" loading={busy === b.key} onClick={async () => {
+                        if (await confirm({ title: 'Go back to this restore point?', body: 'Current data is replaced by this restore point. A new restore point of the current data is saved first. Documents uploaded after it may be missing.', danger: true, confirmLabel: 'Restore' }))
+                          run(b.key, () => api(`/api/backups/${encodeURIComponent(b.key)}/restore`, { method: 'POST' }), 'Restored');
+                      }}>Restore</Button>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>

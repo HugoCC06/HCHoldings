@@ -1,12 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  BarChart3, Briefcase, ChevronsLeft, ChevronsRight, FileText, Gauge, KanbanSquare, Landmark, LibraryBig, LogOut, Menu, Search,
+  BarChart3, Briefcase, ChevronsLeft, ChevronsRight, FileText, Gauge, KanbanSquare, Landmark, LibraryBig, Menu, ShieldAlert, Search,
   Settings as SettingsIcon, Target,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api, useSnapshot } from '../lib/api';
+import { Link } from 'react-router-dom';
+import { useSnapshot } from '../lib/api';
 import { isOverdue } from '../../shared/insights';
+import { daysBetween } from '../../shared/dates';
 import { todayISO } from '../../shared/dates';
 import { CommandPalette } from './CommandPalette';
 import { cx } from '../lib/format';
@@ -36,7 +37,6 @@ export function Layout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const { data } = useSnapshot();
-  const auth = useQuery({ queryKey: ['auth'], queryFn: () => api<{ required: boolean }>('/api/auth') });
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -95,18 +95,6 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/settings" className="btn btn-ghost btn-icon" title="Settings & backups">
             <SettingsIcon size={17} />
           </NavLink>
-          {auth.data?.required && (
-            <button
-              className="btn btn-ghost btn-icon"
-              title="Lock"
-              onClick={async () => {
-                await api('/api/auth/logout', { method: 'POST' });
-                window.location.reload();
-              }}
-            >
-              <LogOut size={17} />
-            </button>
-          )}
           <button className="btn btn-ghost btn-icon" style={{ marginLeft: collapsed ? 0 : 'auto' }} onClick={() => setCollapsed((c) => !c)} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
             {collapsed ? <ChevronsRight size={17} /> : <ChevronsLeft size={17} />}
           </button>
@@ -123,10 +111,27 @@ export function Layout({ children }: { children: ReactNode }) {
           </button>
         </header>
         <main className="content" key={location.pathname.split('/')[1]}>
+          <BackupReminder lastBackupAt={data?.meta?.lastBackupAt ?? null} hasData={!!data && (data.assets.length > 0 || data.transactions.length > 0)} />
           {children}
         </main>
       </div>
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} onNavigate={(to) => { setPaletteOpen(false); navigate(to); }} />}
+    </div>
+  );
+}
+
+/** Data lives only in this browser, so nudge regular backup downloads. */
+function BackupReminder({ lastBackupAt, hasData }: { lastBackupAt: string | null; hasData: boolean }) {
+  if (!hasData) return null;
+  const days = lastBackupAt ? daysBetween(lastBackupAt.slice(0, 10), todayISO()) : null;
+  if (days !== null && days < 14) return null;
+  return (
+    <div className="alert alert-warn no-print" style={{ marginBottom: 18 }}>
+      <ShieldAlert size={16} />
+      <div>
+        Your data is stored only in this browser. {days === null ? 'You have not downloaded a backup yet.' : `Your last backup was ${days} days ago.`}{' '}
+        <Link className="link" to="/settings">Download a backup</Link> and keep it somewhere safe.
+      </div>
     </div>
   );
 }
