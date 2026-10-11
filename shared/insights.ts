@@ -122,14 +122,19 @@ export interface AssetPerformance {
   cumulativeProfit: number;
 }
 
-export function assetPerformance(asset: AssetLite, txns: TxnLite[], valuations: ValuationLite[], endMonth: string): AssetPerformance {
+/**
+ * Performance of one asset for `endMonth`. With `current` set, invested capital and value are the
+ * latest recorded (used for live views); otherwise they are as of the end of `endMonth` (reports).
+ */
+export function assetPerformance(asset: AssetLite, txns: TxnLite[], valuations: ValuationLite[], endMonth: string, current = false): AssetPerformance {
   const at = txns.filter((t) => t.asset_id === asset.id);
   const [p, l] = monthlyTotals(at, [addMonths(endMonth, -1), endMonth]);
   const w = windowTotals(at, endMonth, 12);
   const end = lastDayOfMonth(endMonth);
-  const invested = capitalInvestedInAsset(asset, at, end);
-  const v = latestValuation(valuations, asset.id, end);
-  const cumulativeProfit = sumTotals(at.filter((t) => t.date <= end)).profit;
+  const asOf = current ? undefined : end;
+  const invested = capitalInvestedInAsset(asset, at, asOf);
+  const v = latestValuation(valuations, asset.id, asOf);
+  const cumulativeProfit = sumTotals(at.filter((t) => !asOf || t.date <= asOf)).profit;
   return {
     assetId: asset.id,
     lastMonth: { revenue: l.revenue, opex: l.opex, profit: l.profit },

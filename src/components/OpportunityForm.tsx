@@ -22,7 +22,7 @@ export function OpportunityForm({ opp, onClose, onSaved }: { opp?: Opportunity; 
     if (!m.ok) return f.setErrors(m.errors);
     save
       .mutateAsync({ id: opp?.id, data: { ...v, ...m.out, target_return_pct: numOrNull(v.target_return_pct), assumptions: opp?.assumptions ?? null } })
-      .then((o) => { toast(opp ? 'Opportunity updated' : 'Opportunity added'); onSaved?.(o); onClose(); }, f.handleError);
+      .then((o) => { toast(opp ? 'Opportunity updated' : 'Opportunity added'); onClose(); onSaved?.(o); }, f.handleError);
   };
   return (
     <FormModal title={opp ? `Edit ${opp.name}` : 'New acquisition opportunity'} onClose={onClose} onSubmit={submit} saving={save.isPending} error={f.formError} width={760}>

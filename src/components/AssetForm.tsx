@@ -79,8 +79,8 @@ export function AssetForm({ asset, currentValue, onClose, onSaved }: { asset?: A
       }
       await invalidateAll();
       toast(asset ? 'Asset updated' : 'Asset created');
-      onSaved?.(saved);
       onClose();
+      onSaved?.(saved);
     } catch (e) {
       f.handleError(e);
     } finally {

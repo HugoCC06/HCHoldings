@@ -30,7 +30,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 export function Panel({ title, actions, children, className, pad = true, sub }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; pad?: boolean; sub?: ReactNode }) {
   return (
     <section className={cx('panel', className)}>
-      {(title || actions) && (
+      {(title || actions || sub) && (
         <header className="panel-head">
           <div>
             {title && <h2>{title}</h2>}

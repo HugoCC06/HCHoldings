@@ -30,7 +30,9 @@ export function derivePortfolio(s: Snapshot, endMonth: string, today = todayISO(
   const colorOf = assetColorMap(assets);
   const ttmTxns = txns.filter((t) => monthOf(t.date) >= addMonths(endMonth, -11) && monthOf(t.date) <= endMonth);
   const conc = concentration(ttmTxns);
-  const perf = assets.map((a) => ({ asset: a, ...assetPerformance(a, txns, s.valuations, endMonth) }));
+  // Live views (default month) show current invested capital and values; past-month reports use month-end figures.
+  const current = endMonth === lastCompleteMonth(today);
+  const perf = assets.map((a) => ({ asset: a, ...assetPerformance(a, txns, s.valuations, endMonth, current) }));
   const allTime = sumTotals(txns);
 
   // revenue by asset per month (stacked)

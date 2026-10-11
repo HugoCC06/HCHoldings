@@ -82,6 +82,22 @@ Design decisions:
   with per-row errors before anything is saved, and each import batch can be undone.
 * The server binds to `127.0.0.1` by default and stores data with owner-only file permissions.
 
+## What's in it
+
+| Area | What you can do |
+|---|---|
+| **Dashboard** | KPIs for the last complete month (owned/in-development assets, revenue, expenses, operating profit, capital invested, estimated value, cash, ROIC), warnings, next actions, milestones, pipeline, and charts for revenue/expenses/profit, revenue by asset, portfolio value vs capital invested, capital by asset and revenue concentration |
+| **Assets** | Owned, in-development, ideas and archived tabs; logo, URL, category, dates, purchase price, valuations history, business/revenue model, objectives, risks, time required. Detail page with P&L, transactions, valuations, work, goals, metrics, reviews, notes and documents |
+| **Finance** | Transactions per asset or holding company, filters by asset/category/date/text, bulk delete, CSV import (preview, validation, duplicate detection, undo) and export, monthly P&L statement, cash balance snapshots |
+| **Projects & tasks** | Kanban (drag and drop), list, month calendar, projects with progress, milestones |
+| **Performance** | Side-by-side comparison incl. ROIC, profit per hour, audience, risk and growth potential; goals vs actuals; monthly reviews |
+| **Acquisitions** | Pipeline by stage, verified vs seller-reported monthly figures, valuation calculator (multiple + DCF, three scenarios, IRR, yield, payback, max price), convert to an owned asset |
+| **Notes & documents** | Typed notes with tags and links to assets/projects/opportunities, file uploads, search |
+| **Reports** | Printable monthly report and CSV export |
+| **Settings** | Company name, currency, backups, restore, JSON export |
+
+Press <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> anywhere to search.
+
 ## Tests
 
 ```bash

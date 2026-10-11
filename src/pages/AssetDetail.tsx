@@ -34,7 +34,7 @@ export function AssetDetail() {
 
   const asset = s?.assets.find((a) => a.id === assetId);
   const end = lastCompleteMonth(todayISO());
-  const perf = useMemo(() => (s && asset ? assetPerformance(asset, s.transactions, s.valuations, end) : null), [s, asset, end]);
+  const perf = useMemo(() => (s && asset ? assetPerformance(asset, s.transactions, s.valuations, end, true) : null), [s, asset, end]);
   const monthly = useMemo(() => {
     if (!s || !asset) return [];
     const txns = s.transactions.filter((t) => t.asset_id === asset.id);

@@ -94,3 +94,16 @@ describe('insights', () => {
     expect(metricTrends(metrics, 1)).toEqual([{ name: 'subscribers', latest: 1000, date: '2026-10-01', previous: 900, change: expect.closeTo(1 / 9, 9) }]);
   });
 });
+
+describe('asset performance as-of vs current', () => {
+  it('current mode includes valuations and purchases after the month end', () => {
+    const asset = { id: 1, status: 'operating', origin: 'acquired', start_date: '2026-10-05', acquisition_price: 500 };
+    const vals = [{ asset_id: 1, date: '2026-10-05', value: 800 }];
+    const asOf = assetPerformance(asset, [], vals, '2026-09');
+    expect(asOf.value).toBeNull();
+    expect(asOf.invested).toBe(0);
+    const live = assetPerformance(asset, [], vals, '2026-09', true);
+    expect(live.value).toBe(800);
+    expect(live.invested).toBe(500);
+  });
+});
